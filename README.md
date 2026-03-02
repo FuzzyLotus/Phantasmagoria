@@ -45,6 +45,29 @@ It combines spectral delay, reverse delay, pitch shifting, shimmer, freeze, and 
 
 ---
 
+## Flashing (No Computer Skills Required)
+
+You don't need to install anything or know how to code. Just download the `.bin` file from the [Releases page](https://github.com/FuzzyLotus/Phantasmagoria/releases) and follow these steps:
+
+### Step 1 — Put your Daisy Seed into bootloader mode
+1. Locate the two small buttons on the Daisy Seed: **BOOT** and **RESET**
+2. Hold down **BOOT**
+3. While holding BOOT, tap **RESET**
+4. Release **BOOT**
+5. The Daisy Seed is now ready to receive firmware
+
+### Step 2 — Flash using the web programmer
+1. Go to **[flash.daisy.audio](https://flash.daisy.audio)**
+2. Click **"Use Custom File"**
+3. Select the `phantasmagoria.bin` file you downloaded
+4. Click **"Connect"** and select your Daisy Seed from the popup
+5. Click **"Program"** and wait for it to finish
+6. Your pedal is ready!
+
+> The web programmer works in Chrome or Edge. It will not work in Firefox or Safari.
+
+---
+
 ## Building from Source
 
 ### 1. Clone the DaisyCloudSeed repository and its submodules
