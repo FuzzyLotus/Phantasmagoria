@@ -1,4 +1,4 @@
-# Phantasmagoria
+# Phantasmagoria v31
 ### Spectral Shimmer Delay for the Electrosmith Daisy Seed / PedalPCB Terrarium
 
 Phantasmagoria is a complex, lush spectral delay effect implemented in C++ for the [Daisy Seed](https://electro-smith.com/products/daisy-seed) microcontroller running on the [PedalPCB Terrarium](https://www.pedalpcb.com/product/terrarium/) guitar pedal platform.
@@ -58,13 +58,23 @@ You don't need to install anything or know how to code. Just download the `.bin`
 
 ### Step 2 — Flash using the web programmer
 1. Go to **[flash.daisy.audio](https://flash.daisy.audio)**
-2. Click **"Use Custom File"**
-3. Select the `phantasmagoria.bin` file you downloaded
-4. Click **"Connect"** and select your Daisy Seed from the popup
-5. Click **"Program"** and wait for it to finish
-6. Your pedal is ready!
+2. Click the **File Upload** tab
+3. Click **BROWSE...** and select the `phantasmagoria.bin` file you downloaded
+4. Click the **FLASH** button (this may prompt you to select your Daisy Seed from a browser popup)
+5. Wait for it to finish, and your pedal is ready!
 
 > The web programmer works in Chrome or Edge. It will not work in Firefox or Safari.
+
+### 🪟 Windows Users: Web Flasher Not Working?
+If your Windows PC doesn't recognize the Daisy Seed in the browser flasher, you likely need to replace the default USB driver with WinUSB.
+1. Put your Daisy Seed in BOOT mode (Hold **BOOT**, tap **RESET**, release **BOOT**).
+2. Download and run [Zadig](https://zadig.akeo.ie/).
+3. Go to **Options** > **List All Devices**.
+4. Select **DFU in FS Mode** (or **STM32 BOOTLOADER**) from the main dropdown menu.
+5. Ensure the target driver with the green arrow points to **WinUSB**.
+
+6. Click **Replace Driver**. 
+7. Refresh the web flasher page and try connecting again.
 
 ---
 
@@ -73,7 +83,7 @@ You don't need to install anything or know how to code. Just download the `.bin`
 ### 1. Clone the DaisyCloudSeed repository and its submodules
 
 ```bash
-git clone https://github.com/GuitarML/DaisyCloudSeed
+git clone [https://github.com/GuitarML/DaisyCloudSeed](https://github.com/GuitarML/DaisyCloudSeed)
 cd DaisyCloudSeed
 git submodule update --init --recursive
 ```
@@ -89,7 +99,7 @@ make -C DaisySP
 
 ```bash
 cd petal
-git clone https://github.com/FuzzyLotus/Phantasmagoria
+git clone [https://github.com/FuzzyLotus/Phantasmagoria](https://github.com/FuzzyLotus/Phantasmagoria)
 cd Phantasmagoria
 ```
 
