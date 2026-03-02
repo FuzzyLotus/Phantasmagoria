@@ -136,8 +136,7 @@ You are free to use, modify, and share this project. You may **not** use it in c
 
 ## Credits
 
-## Credits
-
 Built on the [GuitarML DaisyCloudSeed](https://github.com/GuitarML/DaisyCloudSeed) build environment, which bundles [libDaisy](https://github.com/electro-smith/libDaisy) and [DaisySP](https://github.com/electro-smith/DaisySP).
 
 The reverb lineage traces back to [ValdemarOrn/CloudSeed](https://github.com/ValdemarOrn/CloudSeed), the original open source algorithmic reverb plugin that inspired this entire ecosystem.
+`terrarium.h` is copyright [PedalPCB](http://www.pedalpcb.com), included with original copyright notice intact.
