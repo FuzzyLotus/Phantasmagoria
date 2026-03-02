@@ -22,20 +22,18 @@ It combines spectral delay, reverse delay, pitch shifting, shimmer, freeze, and 
 
 | Control | Function |
 |---|---|
-| Knob 1 | Mix (dry/wet) |
-| Knob 2 | Decay / Reverb time |
-| Knob 3 | Pitch shift amount |
-| Knob 4 | Reverse delay mix |
-| Knob 5 | Shimmer level |
-| Knob 6 | Input gain |
-| SW1 | Reverse delay on/off |
-| SW2 | Pitch shift on/off |
-| SW3 | Reverb on/off |
-| SW4 | Shimmer mode (octave up) |
-| FS1 | Bypass (independent of freeze) |
-| FS2 | Freeze — tap to hold, hold to accumulate layers |
-
-> **Note:** Knob assignments may vary slightly depending on your build. Check the source comments in `phantasmagoria.cpp` for the definitive mapping.
+| Knob 1 | Delay Time (20ms – 1800ms) |
+| Knob 2 | Feedback (0 – 95%) |
+| Knob 3 | Reverb Mix |
+| Knob 4 | Tape Warble Depth |
+| Knob 5 | LFO Speed |
+| Knob 6 | Dry/Wet Mix |
+| SW1 | Reverse Delay on/off |
+| SW2 | Fifth Down pitch shift on/off |
+| SW3 | Octave Down pitch shift on/off |
+| SW4 | Shimmer (Octave Up) on/off |
+| FS1 | Bypass |
+| FS2 | Freeze — tap to toggle, hold to accumulate layers |
 
 ---
 
@@ -139,4 +137,5 @@ You are free to use, modify, and share this project. You may **not** use it in c
 Built on the [GuitarML DaisyCloudSeed](https://github.com/GuitarML/DaisyCloudSeed) build environment, which bundles [libDaisy](https://github.com/electro-smith/libDaisy) and [DaisySP](https://github.com/electro-smith/DaisySP).
 
 The reverb lineage traces back to [ValdemarOrn/CloudSeed](https://github.com/ValdemarOrn/CloudSeed), the original open source algorithmic reverb plugin that inspired this entire ecosystem.
+
 `terrarium.h` is copyright [PedalPCB](http://www.pedalpcb.com), included with original copyright notice intact.
