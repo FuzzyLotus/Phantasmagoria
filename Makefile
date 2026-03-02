@@ -15,7 +15,7 @@ CPP_SOURCES = phantasmagoria.cpp
 OPT = -Os
 
 # Terrarium header from the Terrarium submodule
-C_INCLUDES += -I../../Terrarium
+C_INCLUDES += -I.
 
 # DaisySP (all subdirectories)
 DAISYSP_DIR = ../../DaisySP
