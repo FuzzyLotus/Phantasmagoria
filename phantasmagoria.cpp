@@ -1,9 +1,6 @@
 // ============================================================
-// PHANTASMAGORIA v30a — Spectral Delay for Daisy Seed / Terrarium
-// Built on DaisyCloudSeed project structure.
-// THIS IS THE "VERY VERY VERY GOOD" VERSION — restored exactly.
-//
-// Controls:
+// PHANTASMAGORIA v30b — Spectral Delay for Daisy Seed / Terrarium:
+// 
 //   K1 Delay Time   K2 Feedback   K3 Reverb   K4 Tape Depth
 //   K5 LFO Speed    K6 Mix
 //   SW1 Reverse   SW2 Fifth Down   SW3 Octave Down   SW4 Accumulate
@@ -403,7 +400,10 @@ static void UpdateControls()
     tDelay  = (pDelay.Process() * 1780.f + 20.f) * SR_OVER_1000;
     tFb     = pFeedback.Process();
     tRevMix = pReverb.Process();
-    tTapeD  = pTape.Process();
+    float k4 = pTape.Process();
+    float k4Norm = std::max(0.f, std::min((k4 - 0.2f) / (8.0f - 0.2f), 1.f));
+    k4Norm = powf(k4Norm, 2.1f);
+    tTapeD = 0.2f + k4Norm * (8.0f - 0.2f);
     tLfoSpd = pSpeed.Process();
     tMixW   = pMix.Process();
 
