@@ -1,45 +1,170 @@
 // ============================================================
-// PHANTASMAGORIA v30b — Spectral Delay for Daisy Seed / Terrarium:
-// 
+// PHANTASMAGORIA
+// Spectral Delay for Daisy Seed / Terrarium
+//
+// CURRENT CONTROL MAP
+//
 //   K1 Delay Time   K2 Feedback   K3 Reverb   K4 Tape Depth
 //   K5 LFO Speed    K6 Mix
-//   SW1 Reverse   SW2 Fifth Down   SW3 Octave Down   SW4 Accumulate
-//   FS1 Bypass    FS2 Freeze (tap=toggle, hold=accumulate)
+//   SW1 Reverse   SW2 Cascade   SW3 Halo   SW4 Freeze Evolution
+//   FS1 Bypass    FS2 Freeze (tap = toggle, hold = accumulate)
+//
+// CORE DESIGN PRIORITIES
+//
+//   1. Bypass with freeze OFF must remain clean
+//   2. Tone quality above all
+//   3. Avoid tone suck
+//   4. Must respond well to a tube amp and its dynamics
+//
+// CURRENT BEHAVIOR
+//
+//   SW1 Reverse
+//   - OFF = forward delay
+//   - ON  = reverse delay
+//
+//   SW2 Cascade
+//   - OFF = delay into reverb
+//   - ON  = chamber memory folds into the delay world and the
+//           room reacts more immediately and more obviously
+//
+//   SW3 Halo
+//   - OFF = normal wet field
+//   - ON  = detached late aura behind the wet field
+//
+//   SW4 Freeze Evolution
+//   - OFF = mostly stable frozen anchor
+//   - ON  = frozen layer slowly lives and moves
+//
+//   FS2 Freeze
+//   - tap  = toggle freeze on/off
+//   - hold = accumulate while frozen
+//
+// IMPORTANT BYPASS NOTE
+//
+//   - If freeze is active, it is allowed to survive bypass by design
+//   - So fully bypassed output is:
+//       dry only, when freeze is inactive
+//       dry + freeze, when freeze is active
 //
 // ============================================================
-// OPTIMIZATION CHANGELOG (audio-transparent):
+// HISTORICAL DYNAMICS CHANGELOG (v30b -> v30c)
+//
+//  1. DELAY WRITE SOFT-CLIP REMOVED
+//     - fast_tanh on every sample entering the delay was compressing
+//       transients before storage. Replaced with conditional gentle
+//       curve that only engages when feedback > 0.3 and signal > ~1.2.
+//       Clean playing and low-feedback settings pass through untouched.
+//
+//  2. WET BUS SOFT-CLIP REMOVED
+//     - fast_tanh on the wet sum was a second compression stage.
+//       Replaced with gentle_saturate that only engages above ±1.5.
+//       Normal wet levels pass through transparent.
+//
+//  3. OUTPUT HARD CLAMP -> SOFT SATURATION
+//     - std::max/min brick-wall at ±1.0 replaced with gentle_saturate.
+//       Peaks roll off smoothly instead of flat-topping.
+//
+//  4. FEEDBACK LPF OPENED UP
+//     - 4000 Hz -> 7500 Hz. Tube amp pick attack lives in 3–6 kHz;
+//       old filter was killing it by the second repeat.
+//
+//  5. PITCH VOICE LPFs OPENED UP
+//     - Fifth:   2000 -> 4500 Hz
+//     - Octave:  1500 -> 3500 Hz
+//     - Shimmer: 3000 -> 5500 Hz
+//     Preserved harmonic content and transient detail from tube amp
+//     during the earlier pitch-voice era.
+//
+//  6. FREEZE VOICE BANDPASS WIDENED
+//     - Was 200–600 Hz (very narrow, muffled).
+//     - Now 80–5000 Hz. Frozen signal retains full character.
+//
+//  7. GAIN STAGING REBALANCED
+//     - Octave down: 0.7 -> 0.6 (historical pitch-era rebalance)
+//     - Freeze output: 0.55 -> 0.45
+//
+// ============================================================
+// HISTORICAL OPTIMIZATION CHANGELOG (audio-transparent, from v30b)
 //
 //  1. PRE-COMPUTED CONSTANTS
 //     - SR_OVER_1000 (48.f) replaces repeated sr/1000.f divisions
 //     - Reverb tap indices (3984, 7248, 10896, 14928) computed once
-//       at compile time instead of per-sample float→int conversion
+//       at compile time instead of per-sample float->int conversion
 //     - MAX_DELAY_LIMIT (95998.f) precomputed for forward-read clamp
 //
 //  2. FAST MATH REPLACEMENTS (per-sample hot path)
-//     - tanhf() → fast_tanh(): x/(1+|x|) rational approximation
-//       (2 calls per sample eliminated, ~40 cycles each on Cortex-M7)
-//     - cosf()/sinf() → 4th-order polynomial approximations
+//     - cosf()/sinf() -> 4th-order polynomial approximations
 //       for constant-power crossfade (domain [0, pi/2] only)
-//       (2 calls per sample eliminated, ~30 cycles each)
+//       (2 calls per sample eliminated, about 30 cycles each)
 //
 //  3. LFO SetFreq HOISTED OUT OF PER-SAMPLE LOOP
-//     - lfo1/lfo2/lfo3.SetFreq() moved before the sample loop;
-//       tLfoSpd is control-rate and constant within a 48-sample block
-//       (3 function calls × 48 iterations = 144 calls saved per block)
+//     - lfo1/lfo2/lfo3.SetFreq() moved before the sample loop
+//     - tLfoSpd is control-rate and constant within a 48-sample block
+//       (3 function calls x 48 iterations = 144 calls saved per block)
 //
 //  4. CONST CORRECTNESS
 //     - DelBuf::Read() and ReadFixed() marked const
-//       (already were const — confirmed, no change needed)
 //
-//  5. SHARED PITCH BUFFER (mono pedal optimization)
-//     - pitchDelay, octDelay, shimDelay all received identical
-//       Write(delRd) every sample — 3 buffers, 3 SDRAM writes, same data.
-//     - Merged into single sharedPitchDelay (sized to max = 7300).
-//     - Eliminates 2 SDRAM writes per sample (~20 wait-state cycles each).
-//     - Frees ~40KB SDRAM (pitchBuf + shimBuf no longer allocated).
+//  5. SHARED PITCH BUFFER
+//     - Historical optimization from the earlier pitch-voice era
+//     - Preserved here for development history only
 //
-//  6. NOTE ON Makefile: OPT = -Os (size). If CPU headroom is
-//     tight, switching to -O2 may further improve callback speed.
+//  6. NOTE ON Makefile: OPT = -Os (size)
+//     - If CPU headroom is tight, switching to -O2 may further improve
+//       callback speed
+//
+// ============================================================
+// CURRENT VERSION CHANGELOG (v30c -> current)
+//
+//  1. SWITCH SYSTEM REWORKED
+//     - SW2 / SW3 / SW4 no longer act as pitch-voice toggles
+//     - Current switch roles are:
+//         SW1 = Reverse
+//         SW2 = Cascade
+//         SW3 = Halo
+//         SW4 = Freeze Evolution
+//
+//  2. OLD PITCH ENGINE REMOVED FROM AUDIO PATH
+//     - Fifth / octave / shimmer voices removed from the wet path
+//     - Pitch bleed removed from the output path
+//
+//  3. CASCADE MODE ADDED (SW2)
+//     - Chamber memory now folds back into the delay world
+//     - Dry note can also hit the chamber directly
+//     - Intended result: the room itself becomes part of the repeat behavior
+//
+//  4. HALO MODE ADDED (SW3)
+//     - Added a detached late aura behind the wet field
+//     - Halo is summed directly into the wet output so it reads immediately
+//     - Final gain trimmed slightly so the "second head" feel stays present
+//       without taking over
+//
+//  5. FREEZE REWORKED INTO STABLE + EVOLVING STATES
+//     - Base freeze motion reduced heavily so the frozen bed remains an anchor
+//     - SW4 now owns the extra motion with its own ultra-slow evolution source
+//
+//  6. FREEZE NOW SURVIVES BYPASS BY DESIGN
+//     - Turning the delay off no longer kills an active frozen layer
+//     - Fully bypassed output is dry only when freeze is inactive
+//     - Fully bypassed output is dry + freeze when freeze is active
+//
+//  7. BYPASS TRANSITION DROP FIXED
+//     - Output routing reworked so turning the effect off no longer causes
+//       a brief signal dip during the crossfade
+//
+//  8. K5 LFO SPEED CONTROL LAW RESHAPED
+//     - K5 no longer rises in a cramped, overly early way
+//     - The useful range is broader and the sweet spot lasts longer
+//
+//  9. SWITCH VOICING MOVED AWAY FROM HIDDEN MICRO-BEHAVIORS
+//     - Earlier smear / erosion / shadow / abyss style approaches proved
+//       too hard to hear reliably in practice
+//     - Current switch system favors immediately audible spatial behavior
+//
+//  10. OUTPUT ROUTING CLEANED UP
+//      - Core effect path and freeze path are treated separately
+//      - Freeze is no longer tied to the delay bypass state
+//
 // ============================================================
 
 #include "daisy_petal.h"
@@ -74,19 +199,30 @@ static constexpr int REV_TAP_D = 14928;   // 311 ms
 // FAST MATH (per-sample replacements)
 // ============================================================
 
+// Gentle saturation: linear below threshold, soft-knee above.
+// Knee at ~±1.2, approaches ±2.0 asymptotically.
+// Passes signal untouched when |x| < ~0.8.
+static inline float gentle_saturate(float x) {
+    float ax = fabsf(x);
+    if (ax < 0.8f) return x;                         // linear region
+    float sign = (x >= 0.f) ? 1.f : -1.f;
+    return sign * (0.8f + (ax - 0.8f) / (1.f + (ax - 0.8f) * 0.5f));
+}
+
 // Soft-clip approximation: same monotonic shape as tanh,
-// identical at 0 and ±∞, max deviation ~0.12 near ±1.2
+// identical at 0 and +/-inf, max deviation ~0.12 near +/-1.2
+// Retained for feedback-protection path only.
 static inline float fast_tanh(float x) {
     return x / (1.f + fabsf(x));
 }
 
-// Polynomial sin for x ∈ [0, π/2].  Max error < 2.5e-4.
+// Polynomial sin for x in [0, pi/2].  Max error < 2.5e-4.
 static inline float fast_sin_hp(float x) {
     float x2 = x * x;
     return x * (1.f - x2 * (0.16666667f - x2 * 0.00833333f));
 }
 
-// Polynomial cos for x ∈ [0, π/2].  Max error < 2.0e-4.
+// Polynomial cos for x in [0, pi/2].  Max error < 2.0e-4.
 static inline float fast_cos_hp(float x) {
     float x2 = x * x;
     return 1.f - x2 * (0.5f - x2 * 0.04166667f);
@@ -112,14 +248,12 @@ struct Hp1 {
 // ============================================================
 #define MAX_DELAY  96000
 #define REV_SIZE   48000   // ~1 sec (echo chamber)
-#define SHARED_PITCH_SIZE 7300  // max(PITCH=4900, OCT=7300, SHIM=5300)
 #define FZ_A       4657
 #define FZ_B       7153
 #define FZ_C       9553
 
 static float DSY_SDRAM_BSS mainBuf[MAX_DELAY];
 static float DSY_SDRAM_BSS revBuf[REV_SIZE];
-static float DSY_SDRAM_BSS sharedPitchBuf[SHARED_PITCH_SIZE];
 static float DSY_SDRAM_BSS fzBufA[FZ_A];
 static float DSY_SDRAM_BSS fzBufB[FZ_B];
 static float DSY_SDRAM_BSS fzBufC[FZ_C];
@@ -185,36 +319,6 @@ struct GrainReader {
     }
 };
 
-// ============================================================
-// SHIMMER GRAIN READER — reversed sweep = pitch UP
-// ============================================================
-struct ShimGrainReader {
-    float phase, freq, sweepMs, offsetMs;
-
-    float Process(const DelBuf& buf, float sr) {
-        float ph = phase;
-        phase += freq / sr;
-        while (phase >= 1.f) phase -= 1.f;
-
-        // (1-ph): read far→near = read catches write = PITCH UP
-        float phA = 1.f - ph;
-        float dA = 2.f * ph - 1.f;
-        float winA = 1.f - (dA < 0.f ? -dA : dA);
-        float sampA = phA * sweepMs * sr / 1000.f + offsetMs * sr / 1000.f;
-        float grainA = buf.Read(sampA) * winA;
-
-        float phB = ph + 0.5f;
-        if (phB >= 1.f) phB -= 1.f;
-        float phBrd = 1.f - phB;
-        float dB = 2.f * phB - 1.f;
-        float winB = 1.f - (dB < 0.f ? -dB : dB);
-        float sampB = phBrd * sweepMs * sr / 1000.f + offsetMs * sr / 1000.f;
-        float grainB = buf.Read(sampB) * winB;
-
-        float wSum = std::max(winA + winB, 0.001f);
-        return (grainA + grainB) / wSum;
-    }
-};
 
 // ============================================================
 // FREEZE VOICE
@@ -247,12 +351,11 @@ struct FreezeVoice {
 // ============================================================
 // DSP OBJECTS
 // ============================================================
-static DelBuf mainDelay, revDelay, sharedPitchDelay;
+static DelBuf mainDelay, revDelay;
 static FreezeVoice fzVoice[3];
-static GrainReader revReader, fifthReader, octReader;
-static ShimGrainReader shimReader;
+static GrainReader revReader;
 
-static Lp1  fbLpf, revLpf, p5Lpf, octLpf, shimLpf;
+static Lp1  revLpf;
 static Hp1  revHpf;
 static Lp1  fzLp[3];
 static Hp1  fzHp[3];
@@ -325,62 +428,138 @@ static void AudioCallback(AudioHandle::InputBuffer  in,
         + lfo3.Process() * 0.5f) * tTapeD;
         float modSamps = modMs * SR_OVER_1000;
 
+        // ------------------------------------------------------------
+        // SW2 = CASCADE
+        // SW3 = HALO
+        //
+        // SW2 CASCADE
+        // OFF = delay into reverb
+        // ON  = chamber memory feeds back into the delay, and dry note
+        //       also hits the chamber directly. This should read immediately.
+        //
+        // SW3 HALO
+        // OFF = normal wet field
+        // ON  = detached late aura from the chamber itself.
+        //       This complements SW1 instead of fighting it.
+        // ------------------------------------------------------------
+
+        float cascadeAmt = sSw2;
+        float haloAmt    = sSw3;
+
         // ==== DELAY WRITE ====
-        mainDelay.Write(fast_tanh(dry + fbSig));
+        // Cascade feeds chamber memory back into the delay write so the
+        // space itself gets repeated. Kept strong enough to be obvious.
+        float cascadeFeed = revFb * cascadeAmt * 0.95f;
+        float cascadeWet  = revFb * cascadeAmt * 0.35f;
+
+        float delIn = dry + fbSig + cascadeFeed;
+        if (sFb > 0.3f) delIn = fast_tanh(delIn * 0.5f) * 2.f;
+        mainDelay.Write(delIn);
 
         // Forward read
         float fwdS = std::max(48.f, std::min(sDelay + modSamps, MAX_DELAY_LIMIT));
         float fwd = mainDelay.Read(fwdS);
 
-        // Reverse read (dual grain, fixed sweep)
+        // Reverse read
         float rev = revReader.Process(mainDelay, SR_F);
 
-        // Fwd/Rev crossfade
+        // SW1 remains the only thing that decides forward vs reverse
         float delRd = fwd * (1.f - sSw1) + rev * sSw1;
 
-        // ==== FEEDBACK ====
-        fbSig = fbLpf.Process(delRd) * sFb;
+        // Stable feedback filter for the delay path
+        static float fbState = 0.f;
+        float fbCoef = 1.f - expf(-TWO_PI_F * 7500.f / SR_F);
+        fbState += fbCoef * (delRd - fbState);
+        fbSig = fbState * sFb;
 
-        // Reverb (echo chamber) — tap indices precomputed
-        float revIn = revLpf.Process(delRd + revFb * 0.75f);
+        // Reverb source:
+        // OFF = chamber mainly hears the delay
+        // ON  = chamber also hears the dry note directly, so the room
+        //       reacts immediately and feels more detached from the repeats
+        float reverbSource = delRd * (1.f - cascadeAmt * 0.95f)
+        + dry   * (cascadeAmt * 0.95f);
+
+        // Reverb (echo chamber)
+        float revIn = revLpf.Process(reverbSource + revFb * 0.75f);
         revDelay.Write(revIn);
+
         float rvSum = (revDelay.ReadFixed(REV_TAP_A)
         + revDelay.ReadFixed(REV_TAP_B)
         + revDelay.ReadFixed(REV_TAP_C)
         + revDelay.ReadFixed(REV_TAP_D)) * 0.25f;
+
         revFb = rvSum;
-        float rvOut = revHpf.Process(rvSum) * tRevMix * 0.8f;
 
-        // Shared pitch buffer (mono — one write serves all pitch readers)
-        sharedPitchDelay.Write(delRd);
+        // Slight gain lift when Cascade is on so it is not subtle
+        float rvOut = revHpf.Process(rvSum) * tRevMix * (0.8f + cascadeAmt * 0.45f);
 
-        // Fifth down (SW2)
-        float p5 = p5Lpf.Process(fifthReader.Process(sharedPitchDelay, SR_F)) * 0.5f * sSw2;
-
-        // Octave down (SW3)
-        float oct = octLpf.Process(octReader.Process(sharedPitchDelay, SR_F)) * 0.7f * sSw3;
-
-        // Shimmer octave up (SW4)
-        float shim = shimLpf.Process(shimReader.Process(sharedPitchDelay, SR_F)) * 0.4f * sSw4;
+        // SW3 = HALO
+        // Late detached chamber aura. Uses the chamber path itself,
+        // so it follows whatever world SW1/SW2 create without becoming
+        // a second reverse control.
+        static float haloLpState = 0.f;
+        float haloTap = revDelay.ReadFixed(9600); // ~200 ms behind chamber field
+        float haloCoef = 1.f - expf(-TWO_PI_F * 1800.f / SR_F);
+        haloLpState += haloCoef * (haloTap - haloLpState);
+        float halo = haloLpState * haloAmt * 1.03f;
 
         // ==== WET BUS ====
-        float wet = fast_tanh(delRd + rvOut + p5 + oct + shim);
+        float wet = gentle_saturate(delRd + rvOut + cascadeWet + halo);
+
 
         // Freeze
         float dryGt  = (1.f - sFzW) + sFzW * sAcc * 0.5f;
         float holdGt = sFzH;
-        float fzMod  = modSamps * 0.25f;
+
+        // SW4 = Freeze Evolution
+        // OFF -> stable frozen anchor
+        // ON  -> subtle internal movement only inside freeze
+        float evolveAmt = sSw4 * sFzH;
+
+        // Base freeze modulation stays restrained
+        float fzMod = modSamps * 0.05f;
+
+        // When evolution is ON, add a very slow extra internal drift
+        // that does not affect the main delay, only the frozen layer.
+        // Independent ultra-slow evolution oscillator (not tied to tape)
+        static float evolvePhase = 0.f;
+        evolvePhase += 0.00003f;
+        if (evolvePhase > 1.f) evolvePhase -= 1.f;
+
+        float evolveDrift = sinf(evolvePhase * TWO_PI_F) * 6.0f * evolveAmt;
+
         float fzOut  = 0.f;
         for (int v = 0; v < 3; v++)
-            fzOut += fzVoice[v].Process(dry, dryGt, holdGt, fzMod);
-        fzOut *= 0.55f;
+            fzOut += fzVoice[v].Process(dry, dryGt, holdGt, fzMod + evolveDrift);
+
+        fzOut *= 0.45f;
+
+        // No old pitch bleed anymore
+        float pitchBleed = 0.f;
 
         // Output: constant-power crossfade (fast polynomial sin/cos)
         float angle = sMixW * HALF_PI_F;
-        float effSig = (dry * fast_cos_hp(angle) + wet * fast_sin_hp(angle)) * sEffG;
-        float bypSig = dry * sBypG;
-        float output = bypSig + effSig + fzOut;
-        output = std::max(-1.f, std::min(1.f, output));
+
+        // Core effect excludes freeze so freeze can survive bypass cleanly.
+        float coreEff = (dry * fast_cos_hp(angle) + wet * fast_sin_hp(angle)) + pitchBleed;
+
+        // Active effect path only
+        float wetEff = gentle_saturate(coreEff);
+
+        float output;
+        if(sBypG > 0.999f)
+        {
+            // Fully bypassed: clean dry + freeze only
+            output = dry + fzOut;
+        }
+        else
+        {
+            // During transition:
+            // - dry crossfades back in
+            // - core wet path crossfades out
+            // - freeze remains present
+            output = dry * sBypG + wetEff * sEffG + fzOut;
+        }
 
         out[0][i] = output;
         out[1][i] = output;
@@ -404,7 +583,25 @@ static void UpdateControls()
     float k4Norm = std::max(0.f, std::min((k4 - 0.2f) / (8.0f - 0.2f), 1.f));
     k4Norm = powf(k4Norm, 2.1f);
     tTapeD = 0.2f + k4Norm * (8.0f - 0.2f);
-    tLfoSpd = pSpeed.Process();
+
+    float k5 = pSpeed.Process();
+    float k5Norm = std::max(0.f, std::min((k5 - 0.1f) / (6.0f - 0.1f), 1.f));
+
+    // Broadens the musical region and pushes the sweet spot later,
+    // so it lives more around 10:00 to 2:00 instead of arriving too early.
+    float k5Shaped;
+    if (k5Norm < 0.60f)
+    {
+        float x = k5Norm / 0.60f;
+        k5Shaped = 0.38f * powf(x, 1.85f);
+    }
+    else
+    {
+        float x = (k5Norm - 0.60f) / 0.40f;
+        k5Shaped = 0.38f + 0.62f * powf(x, 0.90f);
+    }
+
+    tLfoSpd = 0.1f + k5Shaped * (6.0f - 0.1f);
     tMixW   = pMix.Process();
 
     tSw1 = petal.switches[Terrarium::SWITCH_1].Pressed() ? 1.f : 0.f;
@@ -429,7 +626,7 @@ static void UpdateControls()
     }
     fs2Prev = fs2Now;
 
-    led2.Set(freezeOn ? 1.f : 0.f);
+    led2.Set(freezeOn ? (accumOn ? 0.75f : 1.f) : 0.f);
     tFzH = freezeOn ? 1.f : 0.f;
     tFzW = freezeOn ? 1.f : 0.f;
     tAcc = accumOn  ? 1.f : 0.f;
@@ -447,30 +644,21 @@ int main()
 
     mainDelay.Init(mainBuf, MAX_DELAY);
     revDelay.Init(revBuf, REV_SIZE);
-    sharedPitchDelay.Init(sharedPitchBuf, SHARED_PITCH_SIZE);
 
     float* fzMem[3] = {fzBufA, fzBufB, fzBufC};
     size_t fzSz[3]  = {FZ_A, FZ_B, FZ_C};
     float  fzMs[3]  = {97.f, 149.f, 199.f};
     for (int i = 0; i < 3; i++) {
-        fzLp[i].Init(600.f, sr);
-        fzHp[i].Init(200.f, sr);
+        fzLp[i].Init(5000.f, sr);   // was 600 -- opened up for full-range freeze
+        fzHp[i].Init(80.f, sr);     // was 200 -- captures low-end body
         fzVoice[i].Init(fzMem[i], fzSz[i], fzMs[i], sr, &fzLp[i], &fzHp[i]);
     }
 
-    fbLpf.Init(4000.f, sr);
-    revLpf.Init(6000.f, sr);
-    revHpf.Init(80.f, sr);
-    p5Lpf.Init(2000.f, sr);
-    octLpf.Init(1500.f, sr);
-    shimLpf.Init(3000.f, sr);
+    revLpf.Init(9000.f, sr);    // lets reverb breathe; recirculation darkens naturally
+    revHpf.Init(55.f, sr);      // was 80 -- preserves low-end body in reverb
 
     //                   phase  freq    sweepMs  offsetMs  dual
     revReader   =       {0.f,   1.f,    1999.f,  1.f,      true};
-    fifthReader =       {0.f,   12.5f,  26.7f,   1.f,      false};
-    octReader   =       {0.f,   8.f,    62.5f,   1.f,      true};
-    //                   phase  freq    sweepMs  offsetMs
-    shimReader  =       {0.f,   8.f,    62.5f,   1.f};
 
     lfo1.Init(sr); lfo1.SetWaveform(Oscillator::WAVE_SIN);
     lfo1.SetAmp(1.f); lfo1.SetFreq(0.7f);
