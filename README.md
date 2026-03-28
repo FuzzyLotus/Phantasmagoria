@@ -1,4 +1,4 @@
-# Phantasmagoria v2.1
+# Phantasmagoria v2.11
 
 ### Spectral Delay for the Electrosmith Daisy Seed / PedalPCB Terrarium
 
@@ -11,7 +11,7 @@ It combines spectral delay, reverse delay, spatial room shaping, ambient halo te
 ## Features
 
 * **Spectral Delay** - multi-tap echo chamber reverb with carefully tuned tap timing
-* **Reverse Delay** - sweeping reverse buffer with fixed LFO parameters for consistent feel
+* **Reverse Delay** - sweeping reverse buffer with tape warble modulation for consistent feel
 * **Room Mode** - chamber memory folds into the repeat structure, making the space itself part of the delay world
 * **Halo Mode** - detached late aura behind the wet signal, adding a trailing ghost layer to the ambient field
 * **Freeze** - hold audio in the buffer indefinitely; hold to accumulate new layers; survives bypass
